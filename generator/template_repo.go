@@ -183,6 +183,9 @@ func DefaultFuncMap(lang *LanguageOpts) template.FuncMap {
 			// builds a flag description variable in CLI commands
 			return fmt.Sprintf("flag%sDescription", pascalize(in))
 		},
+		"getSchema":      getSchema,
+		"respSchema":     respSchema,
+		"genJsonExample": genJsonExample,
 	}
 
 	for k, v := range extra {
@@ -190,6 +193,100 @@ func DefaultFuncMap(lang *LanguageOpts) template.FuncMap {
 	}
 
 	return f
+}
+
+func getSchema(app *GenApp, param any) GenDefinition {
+	goType := ""
+
+	switch t := param.(type) {
+	case GenParameter:
+		goType = t.GoType
+	case GenSchema:
+		if t.GoType != "" {
+			goType = t.GoType
+		} else if len(t.Properties) > 0 {
+			goType = t.Properties[0].GoType
+		}
+	}
+
+	for _, m := range app.Models {
+		if goType == m.Pkg+"."+m.GoType {
+			return m
+		}
+	}
+
+	return GenDefinition{}
+}
+
+func respSchema(op GenOperation) GenSchema {
+	for _, s := range op.ExtraSchemas {
+		if s.GoType == op.SuccessResponse.Schema.GoType {
+			return s
+		}
+	}
+	return GenSchema{}
+}
+
+func genSchemaJson(app *GenApp, s GenSchema) map[string]any {
+	data := map[string]any{}
+
+	for _, p := range s.AllOf {
+		d := getSchema(app, p)
+
+		defineJSON := genDefinitionJson(app, d)
+		if d.GoType == "HTTPAPIResponse" {
+			for k, v := range defineJSON {
+				data[k] = v
+			}
+			continue
+		}
+		data["data"] = defineJSON
+	}
+
+	return data
+}
+
+func genDefinitionJson(app *GenApp, s GenDefinition) map[string]any {
+	data := map[string]any{}
+
+	for _, p := range s.Properties {
+		switch p.GoType {
+		case "int64", "int32", "int":
+			data[p.Name] = 0
+		case "float64", "float32":
+			data[p.Name] = 0.0
+		case "bool":
+			data[p.Name] = false
+		case "string":
+			data[p.Name] = ""
+			if p.Example != "" {
+				data[p.Name] = p.Example
+			}
+		default:
+			if p.Example != "" {
+				data[p.Name] = p.Example
+			}
+		}
+	}
+
+	return data
+}
+
+func genJsonExample(app *GenApp, s any) string {
+	data := map[string]any{}
+	switch t := s.(type) {
+	case GenSchema:
+		data = genSchemaJson(app, t)
+	case GenDefinition:
+		data = genDefinitionJson(app, t)
+	}
+
+	body, err := asPrettyJSON(data)
+	if err != nil {
+		panic(err)
+	}
+
+	return string(body)
 }
 
 func defaultAssets() map[string][]byte {

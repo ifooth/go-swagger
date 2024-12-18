@@ -622,6 +622,14 @@ func (g *GenOpts) render(t *TemplateOpts, data interface{}) ([]byte, error) {
 		return nil, fmt.Errorf("template %q not found", t.Source)
 	}
 
+	if os.Getenv("SWAGGER_BODY_DEBUG") != "" {
+		body, err := json.Marshal(data)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal debug data: %w", err)
+		}
+		_ = os.WriteFile("swagger_debug.json", body, 0644)
+	}
+
 	var tBuf bytes.Buffer
 	if err := templ.Execute(&tBuf, data); err != nil {
 		return nil, fmt.Errorf("template execution failed for template %s: %w", t.Name, err)

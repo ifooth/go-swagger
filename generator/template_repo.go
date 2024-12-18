@@ -202,10 +202,19 @@ func getSchema(app *GenApp, param any) GenDefinition {
 	case GenParameter:
 		goType = t.GoType
 	case GenSchema:
+		isArray := t.IsArray
+
 		if t.GoType != "" {
 			goType = t.GoType
 		} else if len(t.Properties) > 0 {
 			goType = t.Properties[0].GoType
+			isArray = t.Properties[0].IsArray
+		}
+
+		// 数组类型处理
+		if isArray {
+			goType = strings.TrimPrefix(goType, "[]*")
+			goType = strings.TrimPrefix(goType, "[]")
 		}
 	}
 
@@ -240,7 +249,14 @@ func genSchemaJson(app *GenApp, s GenSchema) map[string]any {
 			}
 			continue
 		}
-		data["data"] = defineJSON
+		// 返回数组
+		isArray := p.IsArray
+		if len(p.Properties) > 0 {
+			isArray = p.Properties[0].IsArray
+		}
+		if isArray {
+			data["data"] = []any{defineJSON}
+		}
 	}
 
 	return data

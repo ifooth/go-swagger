@@ -216,6 +216,8 @@ func getSchema(app *GenApp, param any) GenDefinition {
 			goType = strings.TrimPrefix(goType, "[]*")
 			goType = strings.TrimPrefix(goType, "[]")
 		}
+	case string:
+		goType = t
 	}
 
 	for _, m := range app.Models {
@@ -268,18 +270,24 @@ func genDefinitionJson(app *GenApp, s GenDefinition) map[string]any {
 	data := map[string]any{}
 
 	for _, p := range s.Properties {
-		switch p.GoType {
-		case "int64", "int32", "int":
+		switch p.SwaggerType {
+		case "integer":
 			data[p.Name] = 0
-		case "float64", "float32":
-			data[p.Name] = 0.0
-		case "bool":
+		case "boolean":
 			data[p.Name] = false
 		case "string":
 			data[p.Name] = ""
 			if p.Example != "" {
 				data[p.Name] = p.Example
 			}
+		case "object":
+			goType := p.Pkg + "." + p.GoType
+			def := getSchema(app, goType)
+			data[p.Name] = genDefinitionJson(app, def)
+		case "array":
+			goType := p.ElemType.Pkg + "." + p.ElemType.GoType
+			def := getSchema(app, goType)
+			data[p.Name] = []any{genDefinitionJson(app, def)}
 		default:
 			if p.Example != "" {
 				data[p.Name] = p.Example

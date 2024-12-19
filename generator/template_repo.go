@@ -256,6 +256,8 @@ func genSchemaJson(app *GenApp, s GenSchema) map[string]any {
 		}
 		if isArray {
 			data["data"] = []any{defineJSON}
+		} else {
+			data["data"] = defineJSON
 		}
 	}
 
